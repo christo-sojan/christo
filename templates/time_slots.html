@@ -1,0 +1,276 @@
+{% extends "base.html" %}
+
+{% block title %}EDUGUARD - Time Slots{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-md-6">
+        <h2 class="text-primary">
+            <i class="fas fa-clock"></i> Time Slots Management
+        </h2>
+        <p class="text-muted">Configure class periods and monitoring intervals</p>
+    </div>
+    <div class="col-md-6 text-end">
+        <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addTimeSlotModal">
+            <i class="fas fa-plus"></i> Add Time Slot
+        </button>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="fas fa-list"></i> Configured Time Slots
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead class="table-dark">
+                            <tr>
+                                <th>Name</th>
+                                <th>Start Time</th>
+                                <th>End Time</th>
+                                <th>Duration</th>
+                                <th>Monitoring</th>
+                                <th>Status</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for slot in slots %}
+                            <tr>
+                                <td><strong>{{ slot.name }}</strong></td>
+                                <td>{{ slot.start_time.strftime('%H:%M') }}</td>
+                                <td>{{ slot.end_time.strftime('%H:%M') }}</td>
+                                <td>
+                                    {% set duration = (slot.end_time.hour * 60 + slot.end_time.minute) - (slot.start_time.hour * 60 + slot.start_time.minute) %}
+                                    {{ duration }} minutes
+                                </td>
+                                <td>
+                                    {% if slot.is_monitoring_period %}
+                                        <span class="badge bg-success">
+                                            <i class="fas fa-eye"></i> Active
+                                        </span>
+                                    {% else %}
+                                        <span class="badge bg-secondary">
+                                            <i class="fas fa-eye-slash"></i> Disabled
+                                        </span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% set now = moment().time() %}
+                                    {% if slot.start_time <= now <= slot.end_time %}
+                                        <span class="badge bg-success">
+                                            <i class="fas fa-circle"></i> Current
+                                        </span>
+                                    {% elif now < slot.start_time %}
+                                        <span class="badge bg-info">
+                                            <i class="fas fa-clock"></i> Upcoming
+                                        </span>
+                                    {% else %}
+                                        <span class="badge bg-secondary">
+                                            <i class="fas fa-check"></i> Completed
+                                        </span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <button class="btn btn-sm btn-info" onclick="editTimeSlot({{ slot.id }})">
+                                        <i class="fas fa-edit"></i>
+                                    </button>
+                                    <button class="btn btn-sm btn-danger" onclick="deleteTimeSlot({{ slot.id }})">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Add Time Slot Modal -->
+<div class="modal fade" id="addTimeSlotModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fas fa-plus"></i> Add New Time Slot
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="addTimeSlotForm">
+                    <div class="mb-3">
+                        <label for="slotName" class="form-label">Name *</label>
+                        <input type="text" class="form-control" id="slotName" placeholder="e.g., Period 1, Break, Lunch" required>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="startTime" class="form-label">Start Time *</label>
+                                <input type="time" class="form-control" id="startTime" required>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="endTime" class="form-label">End Time *</label>
+                                <input type="time" class="form-control" id="endTime" required>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="isMonitoringPeriod" checked>
+                            <label class="form-check-label" for="isMonitoringPeriod">
+                                Enable monitoring for this period
+                            </label>
+                            <small class="form-text text-muted d-block">
+                                Uncheck for breaks or intervals where monitoring should be disabled
+                            </small>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="saveTimeSlot()">
+                    <i class="fas fa-save"></i> Save Time Slot
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    function saveTimeSlot() {
+        const slotData = {
+            name: document.getElementById('slotName').value,
+            start_time: document.getElementById('startTime').value,
+            end_time: document.getElementById('endTime').value,
+            is_monitoring_period: document.getElementById('isMonitoringPeriod').checked
+        };
+
+        // Validate required fields
+        if (!slotData.name || !slotData.start_time || !slotData.end_time) {
+            alert('Please fill in all required fields');
+            return;
+        }
+
+        // Validate time order
+        if (slotData.start_time >= slotData.end_time) {
+            alert('End time must be after start time');
+            return;
+        }
+
+        fetch('/add_time_slot', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(slotData)
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert('Time slot added successfully!');
+                location.reload();
+            } else {
+                alert('Error: ' + data.message);
+            }
+        })
+        .catch(error => {
+            alert('Error adding time slot: ' + error);
+        });
+    }
+
+    function editTimeSlot(slotId) {
+        alert('Edit functionality will be implemented in future updates');
+    }
+
+    function deleteTimeSlot(slotId) {
+        if (confirm('Are you sure you want to delete this time slot?')) {
+            fetch('/delete_time_slot', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({slot_id: slotId})
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    alert('Time slot deleted successfully!');
+                    location.reload();
+                } else {
+                    alert('Error: ' + data.message);
+                }
+            })
+            .catch(error => {
+                alert('Error deleting time slot: ' + error);
+            });
+        }
+    }
+
+    // Reset form when modal is closed
+    document.getElementById('addTimeSlotModal').addEventListener('hidden.bs.modal', function() {
+        document.getElementById('addTimeSlotForm').reset();
+        document.getElementById('isMonitoringPeriod').checked = true;
+    });
+
+    // Add some preset time slots
+    const presetSlots = [
+        { name: 'Period 1', start: '09:00', end: '10:00', monitoring: true },
+        { name: 'Period 2', start: '10:00', end: '11:00', monitoring: true },
+        { name: 'Break', start: '11:00', end: '11:15', monitoring: false },
+        { name: 'Period 3', start: '11:15', end: '12:15', monitoring: true },
+        { name: 'Period 4', start: '12:15', end: '13:15', monitoring: true },
+        { name: 'Lunch', start: '13:15', end: '14:00', monitoring: false },
+        { name: 'Period 5', start: '14:00', end: '15:00', monitoring: true },
+        { name: 'Period 6', start: '15:00', end: '16:00', monitoring: true }
+    ];
+
+    function addPresetSlots() {
+        if (confirm('This will add common college time slots. Continue?')) {
+            presetSlots.forEach(slot => {
+                fetch('/add_time_slot', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        name: slot.name,
+                        start_time: slot.start,
+                        end_time: slot.end,
+                        is_monitoring_period: slot.monitoring
+                    })
+                })
+                .then(response => response.json())
+                .catch(error => console.error('Error adding preset slot:', error));
+            });
+            
+            setTimeout(() => location.reload(), 2000);
+        }
+    }
+
+    // Add preset button if no slots exist
+    document.addEventListener('DOMContentLoaded', function() {
+        const tbody = document.querySelector('tbody');
+        if (tbody.children.length === 0) {
+            const addPresetBtn = document.createElement('button');
+            addPresetBtn.className = 'btn btn-outline-info ms-2';
+            addPresetBtn.innerHTML = '<i class="fas fa-magic"></i> Add Preset Slots';
+            addPresetBtn.onclick = addPresetSlots;
+            
+            document.querySelector('.col-md-6.text-end').appendChild(addPresetBtn);
+        }
+    });
+</script>
+{% endblock %}

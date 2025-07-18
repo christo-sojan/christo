@@ -1,0 +1,450 @@
+{% extends "base.html" %}
+
+{% block title %}EDUGUARD - Attendance{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-md-6">
+        <h2 class="text-primary">
+            <i class="fas fa-calendar-check"></i> Attendance Tracking
+        </h2>
+        <p class="text-muted">Monitor daily attendance for {{ date.strftime('%B %d, %Y') }}</p>
+    </div>
+    <div class="col-md-6 text-end">
+        <div class="btn-group">
+            <button class="btn btn-outline-primary" onclick="markAllPresent()">
+                <i class="fas fa-user-check"></i> Mark All Present
+            </button>
+            <button class="btn btn-outline-danger" onclick="markAllAbsent()">
+                <i class="fas fa-user-times"></i> Mark All Absent
+            </button>
+        </div>
+    </div>
+</div>
+
+<div class="row mb-4">
+    <div class="col-lg-3 col-md-6 mb-3">
+        <div class="card bg-success text-white">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h6 class="card-title">Present</h6>
+                        <h3 id="presentCount">0</h3>
+                    </div>
+                    <div class="align-self-center">
+                        <i class="fas fa-user-check fa-2x"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-3 col-md-6 mb-3">
+        <div class="card bg-danger text-white">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h6 class="card-title">Absent</h6>
+                        <h3 id="absentCount">0</h3>
+                    </div>
+                    <div class="align-self-center">
+                        <i class="fas fa-user-times fa-2x"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-3 col-md-6 mb-3">
+        <div class="card bg-warning text-white">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h6 class="card-title">Late</h6>
+                        <h3 id="lateCount">0</h3>
+                    </div>
+                    <div class="align-self-center">
+                        <i class="fas fa-user-clock fa-2x"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-3 col-md-6 mb-3">
+        <div class="card bg-info text-white">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h6 class="card-title">Attendance %</h6>
+                        <h3 id="attendancePercentage">0%</h3>
+                    </div>
+                    <div class="align-self-center">
+                        <i class="fas fa-chart-pie fa-2x"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">
+                    <i class="fas fa-list"></i> Today's Attendance Record
+                </h5>
+                <div>
+                    <input type="date" class="form-control d-inline-block" style="width: auto;" id="dateFilter" value="{{ date.strftime('%Y-%m-%d') }}">
+                    <button class="btn btn-outline-primary ms-2" onclick="filterByDate()">
+                        <i class="fas fa-filter"></i> Filter
+                    </button>
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead class="table-dark">
+                            <tr>
+                                <th>Student</th>
+                                {% for attendance, student, time_slot in attendances %}
+                                    {% if loop.first %}
+                                        {% set time_slots = [] %}
+                                        {% for att, stu, ts in attendances %}
+                                            {% if ts not in time_slots %}
+                                                {% set _ = time_slots.append(ts) %}
+                                                <th class="text-center">{{ ts.name }}<br><small>{{ ts.start_time.strftime('%H:%M') }}</small></th>
+                                            {% endif %}
+                                        {% endfor %}
+                                        <th>Total</th>
+                                        <th>Actions</th>
+                                        {% break %}
+                                    {% endif %}
+                                {% endfor %}
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% if attendances %}
+                                {% set students_dict = {} %}
+                                {% for attendance, student, time_slot in attendances %}
+                                    {% if student.student_id not in students_dict %}
+                                        {% set _ = students_dict.update({student.student_id: {'student': student, 'slots': {}}}) %}
+                                    {% endif %}
+                                    {% set _ = students_dict[student.student_id]['slots'].update({time_slot.id: attendance}) %}
+                                {% endfor %}
+                                
+                                {% for student_id, data in students_dict.items() %}
+                                <tr>
+                                    <td>
+                                        <div class="d-flex align-items-center">
+                                            {% if data.student.photo_path %}
+                                                <img src="{{ data.student.photo_path }}" 
+                                                     alt="{{ data.student.name }}" 
+                                                     class="rounded-circle me-2" 
+                                                     style="width: 40px; height: 40px; object-fit: cover;">
+                                            {% else %}
+                                                <div class="bg-secondary rounded-circle d-flex align-items-center justify-content-center me-2" 
+                                                     style="width: 40px; height: 40px;">
+                                                    <i class="fas fa-user text-white"></i>
+                                                </div>
+                                            {% endif %}
+                                            <div>
+                                                <strong>{{ data.student.name }}</strong><br>
+                                                <small class="text-muted">{{ data.student.student_id }}</small>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    {% for time_slot_id, attendance in data.slots.items() %}
+                                    <td class="text-center">
+                                        {% if attendance.status == 'present' %}
+                                            <span class="badge bg-success">
+                                                <i class="fas fa-check"></i> P
+                                            </span>
+                                        {% elif attendance.status == 'absent' %}
+                                            <span class="badge bg-danger">
+                                                <i class="fas fa-times"></i> A
+                                            </span>
+                                        {% elif attendance.status == 'late' %}
+                                            <span class="badge bg-warning">
+                                                <i class="fas fa-clock"></i> L
+                                            </span>
+                                        {% endif %}
+                                        {% if attendance.detected_at %}
+                                            <br><small class="text-muted">{{ attendance.detected_at.strftime('%H:%M') }}</small>
+                                        {% endif %}
+                                    </td>
+                                    {% endfor %}
+                                    <td class="text-center">
+                                        {% set present_count = data.slots.values() | selectattr('status', 'equalto', 'present') | list | length %}
+                                        {% set total_slots = data.slots | length %}
+                                        <strong>{{ present_count }}/{{ total_slots }}</strong>
+                                    </td>
+                                    <td>
+                                        <button class="btn btn-sm btn-info" onclick="editAttendance('{{ data.student.student_id }}')">
+                                            <i class="fas fa-edit"></i> Edit
+                                        </button>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            {% else %}
+                                <tr>
+                                    <td colspan="100%" class="text-center text-muted">
+                                        No attendance records found for this date
+                                    </td>
+                                </tr>
+                            {% endif %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Manual Attendance Modal -->
+<div class="modal fade" id="manualAttendanceModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fas fa-edit"></i> Manual Attendance Entry
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="manualAttendanceForm">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="studentSelect" class="form-label">Student *</label>
+                                <select class="form-control" id="studentSelect" required>
+                                    <option value="">Select student...</option>
+                                    <!-- Students will be loaded via JavaScript -->
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="timeSlotSelect" class="form-label">Time Slot *</label>
+                                <select class="form-control" id="timeSlotSelect" required>
+                                    <option value="">Select time slot...</option>
+                                    <!-- Time slots will be loaded via JavaScript -->
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Status *</label>
+                        <div class="btn-group w-100" role="group">
+                            <input type="radio" class="btn-check" name="attendanceStatus" id="statusPresent" value="present">
+                            <label class="btn btn-outline-success" for="statusPresent">
+                                <i class="fas fa-check"></i> Present
+                            </label>
+                            
+                            <input type="radio" class="btn-check" name="attendanceStatus" id="statusAbsent" value="absent">
+                            <label class="btn btn-outline-danger" for="statusAbsent">
+                                <i class="fas fa-times"></i> Absent
+                            </label>
+                            
+                            <input type="radio" class="btn-check" name="attendanceStatus" id="statusLate" value="late">
+                            <label class="btn btn-outline-warning" for="statusLate">
+                                <i class="fas fa-clock"></i> Late
+                            </label>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="saveManualAttendance()">
+                    <i class="fas fa-save"></i> Save Attendance
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    function updateAttendanceStats() {
+        const rows = document.querySelectorAll('tbody tr');
+        let presentCount = 0;
+        let absentCount = 0;
+        let lateCount = 0;
+        let totalStudents = 0;
+
+        rows.forEach(row => {
+            const badges = row.querySelectorAll('.badge');
+            let studentPresent = 0;
+            let studentAbsent = 0;
+            let studentLate = 0;
+
+            badges.forEach(badge => {
+                if (badge.textContent.includes('P')) studentPresent++;
+                else if (badge.textContent.includes('A')) studentAbsent++;
+                else if (badge.textContent.includes('L')) studentLate++;
+            });
+
+            if (studentPresent > 0) presentCount++;
+            if (studentAbsent > 0) absentCount++;
+            if (studentLate > 0) lateCount++;
+            totalStudents++;
+        });
+
+        document.getElementById('presentCount').textContent = presentCount;
+        document.getElementById('absentCount').textContent = absentCount;
+        document.getElementById('lateCount').textContent = lateCount;
+        
+        const percentage = totalStudents > 0 ? Math.round((presentCount / totalStudents) * 100) : 0;
+        document.getElementById('attendancePercentage').textContent = percentage + '%';
+    }
+
+    function filterByDate() {
+        const date = document.getElementById('dateFilter').value;
+        if (date) {
+            window.location.href = `/attendance?date=${date}`;
+        }
+    }
+
+    function editAttendance(studentId) {
+        // Load student data and show modal
+        document.getElementById('manualAttendanceModal').querySelector('[data-bs-dismiss="modal"]').click();
+        
+        // For now, show the manual attendance modal
+        const modal = new bootstrap.Modal(document.getElementById('manualAttendanceModal'));
+        modal.show();
+        
+        // Pre-select the student
+        document.getElementById('studentSelect').value = studentId;
+    }
+
+    function markAllPresent() {
+        if (confirm('Mark all students as present for all periods today?')) {
+            fetch('/bulk_attendance', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    action: 'mark_all_present',
+                    date: document.getElementById('dateFilter').value
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    alert('All students marked as present!');
+                    location.reload();
+                } else {
+                    alert('Error: ' + data.message);
+                }
+            })
+            .catch(error => {
+                alert('Error: ' + error);
+            });
+        }
+    }
+
+    function markAllAbsent() {
+        if (confirm('Mark all students as absent for all periods today?')) {
+            fetch('/bulk_attendance', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    action: 'mark_all_absent',
+                    date: document.getElementById('dateFilter').value
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    alert('All students marked as absent!');
+                    location.reload();
+                } else {
+                    alert('Error: ' + data.message);
+                }
+            })
+            .catch(error => {
+                alert('Error: ' + error);
+            });
+        }
+    }
+
+    function saveManualAttendance() {
+        const studentId = document.getElementById('studentSelect').value;
+        const timeSlotId = document.getElementById('timeSlotSelect').value;
+        const status = document.querySelector('input[name="attendanceStatus"]:checked')?.value;
+
+        if (!studentId || !timeSlotId || !status) {
+            alert('Please fill in all required fields');
+            return;
+        }
+
+        fetch('/mark_attendance', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                student_id: studentId,
+                time_slot_id: parseInt(timeSlotId),
+                status: status
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert('Attendance marked successfully!');
+                location.reload();
+            } else {
+                alert('Error: ' + data.message);
+            }
+        })
+        .catch(error => {
+            alert('Error marking attendance: ' + error);
+        });
+    }
+
+    // Initialize page
+    document.addEventListener('DOMContentLoaded', function() {
+        updateAttendanceStats();
+        
+        // Load students and time slots for manual entry
+        loadStudentsAndTimeSlots();
+    });
+
+    function loadStudentsAndTimeSlots() {
+        // Load students
+        fetch('/api/students')
+            .then(response => response.json())
+            .then(data => {
+                const select = document.getElementById('studentSelect');
+                data.students.forEach(student => {
+                    const option = document.createElement('option');
+                    option.value = student.student_id;
+                    option.textContent = `${student.name} (${student.student_id})`;
+                    select.appendChild(option);
+                });
+            })
+            .catch(error => console.error('Error loading students:', error));
+
+        // Load time slots
+        fetch('/api/time_slots')
+            .then(response => response.json())
+            .then(data => {
+                const select = document.getElementById('timeSlotSelect');
+                data.time_slots.forEach(slot => {
+                    const option = document.createElement('option');
+                    option.value = slot.id;
+                    option.textContent = `${slot.name} (${slot.start_time} - ${slot.end_time})`;
+                    select.appendChild(option);
+                });
+            })
+            .catch(error => console.error('Error loading time slots:', error));
+    }
+</script>
+{% endblock %}

@@ -1,0 +1,383 @@
+{% extends "base.html" %}
+
+{% block title %}EDUGUARD - Special Permissions{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-md-6">
+        <h2 class="text-primary">
+            <i class="fas fa-user-check"></i> Special Permissions
+        </h2>
+        <p class="text-muted">Manage authorized absences and special cases</p>
+    </div>
+    <div class="col-md-6 text-end">
+        <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addPermissionModal">
+            <i class="fas fa-plus"></i> Grant Permission
+        </button>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="fas fa-list"></i> Active Permissions
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead class="table-dark">
+                            <tr>
+                                <th>Student</th>
+                                <th>Date</th>
+                                <th>Time Period</th>
+                                <th>Reason</th>
+                                <th>Approved By</th>
+                                <th>Created</th>
+                                <th>Status</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for permission, student, time_slot in permissions %}
+                            <tr>
+                                <td>
+                                    <div class="d-flex align-items-center">
+                                        {% if student.photo_path %}
+                                            <img src="{{ student.photo_path }}" 
+                                                 alt="{{ student.name }}" 
+                                                 class="rounded-circle me-2" 
+                                                 style="width: 30px; height: 30px; object-fit: cover;">
+                                        {% else %}
+                                            <div class="bg-secondary rounded-circle d-flex align-items-center justify-content-center me-2" 
+                                                 style="width: 30px; height: 30px;">
+                                                <i class="fas fa-user text-white small"></i>
+                                            </div>
+                                        {% endif %}
+                                        <div>
+                                            <strong>{{ student.name }}</strong><br>
+                                            <small class="text-muted">{{ student.student_id }}</small>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td>
+                                    <strong>{{ permission.date.strftime('%Y-%m-%d') }}</strong><br>
+                                    <small class="text-muted">{{ permission.date.strftime('%A') }}</small>
+                                </td>
+                                <td>
+                                    <strong>{{ time_slot.name }}</strong><br>
+                                    <small class="text-muted">
+                                        {{ time_slot.start_time.strftime('%H:%M') }} - {{ time_slot.end_time.strftime('%H:%M') }}
+                                    </small>
+                                </td>
+                                <td>
+                                    <div class="permission-reason">
+                                        {{ permission.reason }}
+                                    </div>
+                                </td>
+                                <td>
+                                    <strong>{{ permission.approved_by }}</strong>
+                                </td>
+                                <td>
+                                    <small>{{ permission.created_at.strftime('%Y-%m-%d %H:%M') }}</small>
+                                </td>
+                                <td>
+                                    {% set today = moment().date() %}
+                                    {% if permission.date < today %}
+                                        <span class="badge bg-secondary">
+                                            <i class="fas fa-history"></i> Expired
+                                        </span>
+                                    {% elif permission.date == today %}
+                                        <span class="badge bg-success">
+                                            <i class="fas fa-calendar-day"></i> Active Today
+                                        </span>
+                                    {% else %}
+                                        <span class="badge bg-info">
+                                            <i class="fas fa-calendar-plus"></i> Scheduled
+                                        </span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <button class="btn btn-sm btn-info" onclick="viewPermission({{ permission.id }})">
+                                        <i class="fas fa-eye"></i>
+                                    </button>
+                                    <button class="btn btn-sm btn-danger" onclick="revokePermission({{ permission.id }})">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Add Permission Modal -->
+<div class="modal fade" id="addPermissionModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fas fa-plus"></i> Grant Special Permission
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="addPermissionForm">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="studentSelect" class="form-label">Student *</label>
+                                <select class="form-control" id="studentSelect" required>
+                                    <option value="">Select student...</option>
+                                    <!-- Students will be loaded via JavaScript -->
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="permissionDate" class="form-label">Date *</label>
+                                <input type="date" class="form-control" id="permissionDate" required>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="timeSlotSelect" class="form-label">Time Period *</label>
+                                <select class="form-control" id="timeSlotSelect" required>
+                                    <option value="">Select time period...</option>
+                                    <!-- Time slots will be loaded via JavaScript -->
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="approvedBy" class="form-label">Approved By *</label>
+                                <input type="text" class="form-control" id="approvedBy" placeholder="Official name" required>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="reason" class="form-label">Reason *</label>
+                        <textarea class="form-control" id="reason" rows="3" placeholder="Reason for absence..." required></textarea>
+                    </div>
+                    <div class="mb-3">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="notifyOfficials">
+                            <label class="form-check-label" for="notifyOfficials">
+                                Notify officials about this permission
+                            </label>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="savePermission()">
+                    <i class="fas fa-save"></i> Grant Permission
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Quick Permission Templates -->
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h6 class="mb-0">
+                    <i class="fas fa-magic"></i> Quick Permission Templates
+                </h6>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-3 mb-2">
+                        <button class="btn btn-outline-info w-100" onclick="useTemplate('Medical appointment')">
+                            <i class="fas fa-stethoscope"></i><br>Medical Appointment
+                        </button>
+                    </div>
+                    <div class="col-md-3 mb-2">
+                        <button class="btn btn-outline-info w-100" onclick="useTemplate('Family emergency')">
+                            <i class="fas fa-home"></i><br>Family Emergency
+                        </button>
+                    </div>
+                    <div class="col-md-3 mb-2">
+                        <button class="btn btn-outline-info w-100" onclick="useTemplate('Official college event')">
+                            <i class="fas fa-calendar-alt"></i><br>College Event
+                        </button>
+                    </div>
+                    <div class="col-md-3 mb-2">
+                        <button class="btn btn-outline-info w-100" onclick="useTemplate('Personal leave')">
+                            <i class="fas fa-user"></i><br>Personal Leave
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    function savePermission() {
+        const permissionData = {
+            student_id: document.getElementById('studentSelect').value,
+            date: document.getElementById('permissionDate').value,
+            time_slot_id: document.getElementById('timeSlotSelect').value,
+            reason: document.getElementById('reason').value,
+            approved_by: document.getElementById('approvedBy').value
+        };
+
+        // Validate required fields
+        if (!permissionData.student_id || !permissionData.date || !permissionData.time_slot_id || 
+            !permissionData.reason || !permissionData.approved_by) {
+            alert('Please fill in all required fields');
+            return;
+        }
+
+        fetch('/add_permission', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(permissionData)
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert('Permission granted successfully!');
+                location.reload();
+            } else {
+                alert('Error: ' + data.message);
+            }
+        })
+        .catch(error => {
+            alert('Error granting permission: ' + error);
+        });
+    }
+
+    function viewPermission(permissionId) {
+        alert('View permission details - Feature coming soon');
+    }
+
+    function revokePermission(permissionId) {
+        if (confirm('Are you sure you want to revoke this permission?')) {
+            fetch('/revoke_permission', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({permission_id: permissionId})
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    alert('Permission revoked successfully!');
+                    location.reload();
+                } else {
+                    alert('Error: ' + data.message);
+                }
+            })
+            .catch(error => {
+                alert('Error revoking permission: ' + error);
+            });
+        }
+    }
+
+    function useTemplate(reason) {
+        document.getElementById('reason').value = reason;
+        
+        // Show modal if not already open
+        if (!document.getElementById('addPermissionModal').classList.contains('show')) {
+            const modal = new bootstrap.Modal(document.getElementById('addPermissionModal'));
+            modal.show();
+        }
+    }
+
+    function loadStudentsAndTimeSlots() {
+        // Load students
+        fetch('/api/students')
+            .then(response => response.json())
+            .then(data => {
+                const select = document.getElementById('studentSelect');
+                data.students.forEach(student => {
+                    const option = document.createElement('option');
+                    option.value = student.student_id;
+                    option.textContent = `${student.name} (${student.student_id})`;
+                    select.appendChild(option);
+                });
+            })
+            .catch(error => console.error('Error loading students:', error));
+
+        // Load time slots
+        fetch('/api/time_slots')
+            .then(response => response.json())
+            .then(data => {
+                const select = document.getElementById('timeSlotSelect');
+                data.time_slots.forEach(slot => {
+                    const option = document.createElement('option');
+                    option.value = slot.id;
+                    option.textContent = `${slot.name} (${slot.start_time} - ${slot.end_time})`;
+                    select.appendChild(option);
+                });
+            })
+            .catch(error => console.error('Error loading time slots:', error));
+    }
+
+    // Set default date to today
+    document.addEventListener('DOMContentLoaded', function() {
+        const today = new Date().toISOString().split('T')[0];
+        document.getElementById('permissionDate').value = today;
+        
+        loadStudentsAndTimeSlots();
+    });
+
+    // Reset form when modal is closed
+    document.getElementById('addPermissionModal').addEventListener('hidden.bs.modal', function() {
+        document.getElementById('addPermissionForm').reset();
+        const today = new Date().toISOString().split('T')[0];
+        document.getElementById('permissionDate').value = today;
+    });
+
+    // Bulk permission functionality
+    function grantBulkPermission() {
+        const reason = prompt('Enter reason for bulk permission:');
+        if (reason) {
+            const date = prompt('Enter date (YYYY-MM-DD):');
+            if (date) {
+                fetch('/bulk_permission', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        reason: reason,
+                        date: date,
+                        approved_by: 'Administrator'
+                    })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        alert('Bulk permission granted successfully!');
+                        location.reload();
+                    } else {
+                        alert('Error: ' + data.message);
+                    }
+                })
+                .catch(error => {
+                    alert('Error: ' + error);
+                });
+            }
+        }
+    }
+</script>
+{% endblock %}

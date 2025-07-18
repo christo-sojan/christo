@@ -1,0 +1,311 @@
+{% extends "base.html" %}
+
+{% block title %}EDUGUARD - Alerts{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-md-6">
+        <h2 class="text-primary">
+            <i class="fas fa-exclamation-triangle"></i> Security Alerts
+        </h2>
+        <p class="text-muted">Monitor unauthorized presence and security violations</p>
+    </div>
+    <div class="col-md-6 text-end">
+        <div class="btn-group">
+            <button class="btn btn-outline-secondary" onclick="filterAlerts('all')">All</button>
+            <button class="btn btn-outline-warning" onclick="filterAlerts('pending')">Pending</button>
+            <button class="btn btn-outline-success" onclick="filterAlerts('acknowledged')">Acknowledged</button>
+        </div>
+    </div>
+</div>
+
+<div class="row mb-4">
+    <div class="col-lg-3 col-md-6 mb-3">
+        <div class="card bg-danger text-white">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h6 class="card-title">Total Alerts</h6>
+                        <h3>{{ alerts|length }}</h3>
+                    </div>
+                    <div class="align-self-center">
+                        <i class="fas fa-exclamation-triangle fa-2x"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-3 col-md-6 mb-3">
+        <div class="card bg-warning text-white">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h6 class="card-title">Pending</h6>
+                        <h3 id="pendingCount">0</h3>
+                    </div>
+                    <div class="align-self-center">
+                        <i class="fas fa-clock fa-2x"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-3 col-md-6 mb-3">
+        <div class="card bg-info text-white">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h6 class="card-title">Today's Alerts</h6>
+                        <h3 id="todayCount">0</h3>
+                    </div>
+                    <div class="align-self-center">
+                        <i class="fas fa-calendar-day fa-2x"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-3 col-md-6 mb-3">
+        <div class="card bg-success text-white">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h6 class="card-title">Resolved</h6>
+                        <h3 id="resolvedCount">0</h3>
+                    </div>
+                    <div class="align-self-center">
+                        <i class="fas fa-check-circle fa-2x"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">
+                    <i class="fas fa-list"></i> Alert History
+                </h5>
+                <button class="btn btn-sm btn-outline-primary" onclick="refreshAlerts()">
+                    <i class="fas fa-sync-alt"></i> Refresh
+                </button>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead class="table-dark">
+                            <tr>
+                                <th>Status</th>
+                                <th>Student</th>
+                                <th>Alert Type</th>
+                                <th>Time Period</th>
+                                <th>Message</th>
+                                <th>Time</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="alertsTableBody">
+                            {% for alert, student, time_slot in alerts %}
+                            <tr class="alert-row" data-status="{{ alert.status }}" data-date="{{ alert.created_at.strftime('%Y-%m-%d') }}">
+                                <td>
+                                    {% if alert.status == 'pending' %}
+                                        <span class="badge bg-warning">
+                                            <i class="fas fa-clock"></i> Pending
+                                        </span>
+                                    {% elif alert.status == 'sent' %}
+                                        <span class="badge bg-info">
+                                            <i class="fas fa-paper-plane"></i> Sent
+                                        </span>
+                                    {% else %}
+                                        <span class="badge bg-success">
+                                            <i class="fas fa-check"></i> Acknowledged
+                                        </span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <div class="d-flex align-items-center">
+                                        {% if student.photo_path %}
+                                            <img src="{{ student.photo_path }}" 
+                                                 alt="{{ student.name }}" 
+                                                 class="rounded-circle me-2" 
+                                                 style="width: 30px; height: 30px; object-fit: cover;">
+                                        {% else %}
+                                            <div class="bg-secondary rounded-circle d-flex align-items-center justify-content-center me-2" 
+                                                 style="width: 30px; height: 30px;">
+                                                <i class="fas fa-user text-white small"></i>
+                                            </div>
+                                        {% endif %}
+                                        <div>
+                                            <strong>{{ student.name }}</strong><br>
+                                            <small class="text-muted">{{ student.student_id }}</small>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td>
+                                    {% if alert.alert_type == 'unauthorized_presence' %}
+                                        <span class="badge bg-danger">
+                                            <i class="fas fa-user-slash"></i> Unauthorized Presence
+                                        </span>
+                                    {% elif alert.alert_type == 'late_arrival' %}
+                                        <span class="badge bg-warning">
+                                            <i class="fas fa-user-clock"></i> Late Arrival
+                                        </span>
+                                    {% else %}
+                                        <span class="badge bg-secondary">{{ alert.alert_type }}</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if time_slot %}
+                                        <strong>{{ time_slot.name }}</strong><br>
+                                        <small class="text-muted">
+                                            {{ time_slot.start_time.strftime('%H:%M') }} - {{ time_slot.end_time.strftime('%H:%M') }}
+                                        </small>
+                                    {% else %}
+                                        <span class="text-muted">-</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <div class="alert-message">
+                                        {{ alert.message }}
+                                    </div>
+                                </td>
+                                <td>
+                                    <strong>{{ alert.created_at.strftime('%H:%M:%S') }}</strong><br>
+                                    <small class="text-muted">{{ alert.created_at.strftime('%Y-%m-%d') }}</small>
+                                </td>
+                                <td>
+                                    {% if alert.status == 'pending' %}
+                                        <button class="btn btn-sm btn-success" onclick="acknowledgeAlert({{ alert.id }})">
+                                            <i class="fas fa-check"></i> Acknowledge
+                                        </button>
+                                    {% else %}
+                                        <button class="btn btn-sm btn-outline-secondary" disabled>
+                                            <i class="fas fa-check"></i> Processed
+                                        </button>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Alert Details Modal -->
+<div class="modal fade" id="alertDetailsModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title">
+                    <i class="fas fa-exclamation-triangle"></i> Alert Details
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="alertDetailsBody">
+                <!-- Alert details will be loaded here -->
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-success" id="acknowledgeAlertBtn">
+                    <i class="fas fa-check"></i> Acknowledge
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    function filterAlerts(status) {
+        const rows = document.querySelectorAll('.alert-row');
+        rows.forEach(row => {
+            if (status === 'all' || row.dataset.status === status) {
+                row.style.display = '';
+            } else {
+                row.style.display = 'none';
+            }
+        });
+        
+        // Update button states
+        document.querySelectorAll('.btn-group .btn').forEach(btn => {
+            btn.classList.remove('active');
+        });
+        event.target.classList.add('active');
+    }
+
+    function acknowledgeAlert(alertId) {
+        if (confirm('Are you sure you want to acknowledge this alert?')) {
+            fetch('/acknowledge_alert', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({alert_id: alertId})
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    alert('Alert acknowledged successfully!');
+                    location.reload();
+                } else {
+                    alert('Error: ' + data.message);
+                }
+            })
+            .catch(error => {
+                alert('Error acknowledging alert: ' + error);
+            });
+        }
+    }
+
+    function refreshAlerts() {
+        location.reload();
+    }
+
+    // Update counters
+    function updateCounters() {
+        const rows = document.querySelectorAll('.alert-row');
+        const today = new Date().toISOString().split('T')[0];
+        
+        let pendingCount = 0;
+        let todayCount = 0;
+        let resolvedCount = 0;
+        
+        rows.forEach(row => {
+            const status = row.dataset.status;
+            const date = row.dataset.date;
+            
+            if (status === 'pending') {
+                pendingCount++;
+            } else if (status === 'acknowledged') {
+                resolvedCount++;
+            }
+            
+            if (date === today) {
+                todayCount++;
+            }
+        });
+        
+        document.getElementById('pendingCount').textContent = pendingCount;
+        document.getElementById('todayCount').textContent = todayCount;
+        document.getElementById('resolvedCount').textContent = resolvedCount;
+    }
+
+    // Initialize counters on page load
+    document.addEventListener('DOMContentLoaded', updateCounters);
+
+    // Auto-refresh every 30 seconds
+    setInterval(function() {
+        location.reload();
+    }, 30000);
+</script>
+{% endblock %}
